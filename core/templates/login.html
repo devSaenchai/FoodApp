@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Order Food</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/app_design.css' %}">
+</head>
+<body>
+    <div class="mobile-frame">
+        <div class="scroll-content" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="margin-top: 40px;">
+                    <h1 class="app-title">Order Food</h1>
+                    <div class="app-subtitle">Anytime Anywhere</div>
+                </div>
+                <div style="margin-top: 30px; background: rgba(255,255,255,0.7); padding: 10px 16px; border-radius: 20px; display: inline-block;">
+                    📍 <span style="font-weight: 600; font-size: 14px;">Seat: {{ seat|default:"default" }}</span>
+                </div>
+            </div>
+
+            <form method="POST" action="{% url 'login' %}" style="margin-bottom: 20px;">
+                {% csrf_token %}
+                <input type="hidden" name="seat" value="{{ seat|default:'default' }}">
+                <input type="hidden" name="theater" value="{{ request.GET.theater|default:request.session.theater_id|default:'1' }}">
+                
+                <input type="text" name="name" class="input-box" placeholder="Your Name" required>
+                <input type="tel" name="phone" class="input-box" placeholder="Phone Number" required style="margin-bottom: 20px;">
+                <button type="submit" class="primary-btn">Get Started ➔</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        localStorage.removeItem('cart');
+        localStorage.removeItem('theater_cart');
+    </script>
+</body>
+</html>
