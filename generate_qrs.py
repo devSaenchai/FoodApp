@@ -2,13 +2,13 @@ import os
 import qrcode
 
 # 1. Set your server domain or local IP (e.g., "http://192.168.1.50:8000")
-BASE_URL = "http://192.168.1.50:8000"
+BASE_URL = "https://saenchai.pythonanywhere.com/"
 
 # 2. Define the Theater/Screen ID you are generating codes for
 THEATER_ID = 1
 
 # 3. Define seat list layout
-ROWS = ['A', 'B', 'C']
+ROWS = ['A']
 SEATS_PER_ROW = 5
 
 # Directory to save generated QR code images

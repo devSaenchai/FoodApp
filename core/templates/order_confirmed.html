@@ -33,7 +33,7 @@
                     {% if order.payment_method == 'CASH' %}
                         💵 Pay Cash on Delivery / Pickup (₹{{ order.total_amount }})
                     {% elif order.is_paid %}
-                        ✅ Paid via UPI (₹{{ order.total_amount }})
+                        ✅ Paid Online (₹{{ order.total_amount }})
                     {% else %}
                         ⏳ Payment Verification Pending (₹{{ order.total_amount }})
                     {% endif %}

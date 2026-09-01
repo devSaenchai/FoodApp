@@ -1,8 +1,9 @@
 import json
-import urllib.parse
+import razorpay
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseBadRequest
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 from .models import Theater, FoodItem, Order, OrderItem
 
 def login_view(request):
@@ -41,77 +42,126 @@ def checkout_view(request):
 
 def create_direct_upi_order(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        items_data = data.get('items', [])
-        payment_method = data.get('payment_method', 'ONLINE')
-        fulfillment_type = data.get('fulfillment_type', 'SEAT')
+        try:
+            data = json.loads(request.body)
+            items_data = data.get('items', [])
+            payment_method = data.get('payment_method', 'ONLINE')
+            fulfillment_type = data.get('fulfillment_type', 'SEAT')
+            
+            theater_id = request.session.get('theater_id', 1)
+            theater = Theater.objects.filter(id=theater_id).first() or Theater.objects.first()
+            customer_name = request.session.get('customer_name', 'Guest')
+            customer_phone = request.session.get('customer_phone', '0000000000')
+            seat_number = request.session.get('seat', 'default')
+
+            subtotal = 0
+            order_items_to_create = []
+
+            for item in items_data:
+                food_item = get_object_or_404(FoodItem, id=item['id'])
+                qty = int(item['qty'])
+                subtotal += food_item.price * qty
+                order_items_to_create.append((food_item, qty, food_item.price))
+
+            delivery_fee = 10 if fulfillment_type == 'SEAT' else 0
+            total_amount = subtotal + delivery_fee
+            amount_in_paise = int(total_amount * 100)
+
+            # Minimum amount check (100 paise = ₹1)
+            if amount_in_paise < 100:
+                return JsonResponse({'error': 'Minimum order amount must be at least ₹1.'}, status=400)
+
+            order = Order.objects.create(
+                theater=theater,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                seat_number=seat_number,
+                fulfillment_type=fulfillment_type,
+                payment_method=payment_method,
+                total_amount=total_amount,
+                status='CONFIRMED' if payment_method == 'CASH' else 'PENDING'
+            )
+
+            for food_item, qty, price in order_items_to_create:
+                OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=price)
+
+            if payment_method == 'CASH':
+                return JsonResponse({'status': 'CASH_SUCCESS', 'order_id': order.id})
+
+            # Initialize Razorpay Client
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            
+            razorpay_data = {
+                "amount": amount_in_paise,
+                "currency": "INR",
+                "receipt": f"order_rcptid_{order.id}",
+                "payment_capture": 1
+            }
+            
+            razorpay_order = client.order.create(data=razorpay_data)
+            
+            order.razorpay_order_id = razorpay_order['id']
+            order.save()
+
+            return JsonResponse({
+                'status': 'RAZORPAY_ORDER_CREATED',
+                'order_id': order.id,
+                'razorpay_order_id': razorpay_order['id'],
+                'razorpay_merchant_key': settings.RAZORPAY_KEY_ID,
+                'total_amount': amount_in_paise,
+                'currency': 'INR'
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def verify_razorpay_payment(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            razorpay_order_id = data.get('razorpay_order_id')
+            razorpay_payment_id = data.get('razorpay_payment_id')
+            razorpay_signature = data.get('razorpay_signature')
+            order_id = data.get('order_id')
+
+            if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id]):
+                return JsonResponse({'status': 'FAILURE', 'error': 'Missing payment fields'}, status=400)
+
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            
+            # Verify signature using Razorpay utility
+            params_dict = {
+                'razorpay_order_id': razorpay_order_id,
+                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_signature': razorpay_signature
+            }
+            
+            client.utility.verify_payment_signature(params_dict)
+
+            # If signature verification succeeds, update order status
+            order = get_object_or_404(Order, id=order_id)
+            order.transaction_id = razorpay_payment_id
+            order.status = 'CONFIRMED'
+            order.is_paid = True
+            order.save()
+
+            return JsonResponse({'status': 'SUCCESS', 'order_id': order.id})
         
-        theater_id = request.session.get('theater_id', 1)
-        theater = Theater.objects.filter(id=theater_id).first() or Theater.objects.first()
-        customer_name = request.session.get('customer_name', 'Guest')
-        customer_phone = request.session.get('customer_phone', '0000000000')
-        seat_number = request.session.get('seat', 'default')
-
-        subtotal = 0
-        order_items_to_create = []
-
-        for item in items_data:
-            food_item = get_object_or_404(FoodItem, id=item['id'])
-            qty = int(item['qty'])
-            subtotal += food_item.price * qty
-            order_items_to_create.append((food_item, qty, food_item.price))
-
-        delivery_fee = 10 if fulfillment_type == 'SEAT' else 0
-        total_amount = subtotal + delivery_fee
-
-        order = Order.objects.create(
-            theater=theater,
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            seat_number=seat_number,
-            fulfillment_type=fulfillment_type,
-            payment_method=payment_method,
-            total_amount=total_amount,
-            status='CONFIRMED' if payment_method == 'CASH' else 'PENDING'
-        )
-
-        for food_item, qty, price in order_items_to_create:
-            OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=price)
-
-        if payment_method == 'CASH':
-            return JsonResponse({'status': 'CASH_SUCCESS', 'order_id': order.id})
-
-        # Build UPI Deep Link
-        upi_id = getattr(settings, 'UPI_ID', 'sanjayn1229-6@okicici')
-        merchant_name = getattr(settings, 'MERCHANT_NAME', 'Theater Snacks')
-        note = f"Order #{order.id}"
-        
-        upi_url = (
-            f"upi://pay?pa={upi_id}"
-            f"&pn={urllib.parse.quote(merchant_name)}"
-            f"&am={total_amount}"
-            f"&cu=INR"
-            f"&tn={urllib.parse.quote(note)}"
-        )
-        
-        qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(upi_url)}"
-
-        return JsonResponse({
-            'status': 'UPI_GENERATED',
-            'order_id': order.id,
-            'total_amount': str(total_amount),
-            'upi_deep_link': upi_url,
-            'qr_image_url': qr_api_url
-        })
+        except razorpay.errors.SignatureVerificationError:
+            return JsonResponse({'status': 'FAILURE', 'error': 'Signature verification failed'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'FAILURE', 'error': str(e)}, status=500)
+            
+    return HttpResponseBadRequest("Invalid request method")
 
 def verify_upi_utr(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
     if request.method == 'POST':
-        order = get_object_or_404(Order, id=order_id)
-        utr_number = request.POST.get('utr_number')
-        order.transaction_id = utr_number
         order.status = 'CONFIRMED'
+        order.is_paid = True
         order.save()
-        return redirect('order_confirmed', order_id=order.id)
+        return JsonResponse({'status': 'SUCCESS', 'order_id': order.id})
+    return JsonResponse({'status': 'FAILURE', 'error': 'Invalid request method'}, status=400)
 
 def order_confirmed(request, order_id):
     order = get_object_or_404(Order, id=order_id)

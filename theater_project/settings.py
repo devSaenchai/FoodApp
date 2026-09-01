@@ -76,6 +76,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Direct UPI Payment Settings
-UPI_ID = os.environ.get('UPI_ID', 'sanjayn1229-6@okicici')
-MERCHANT_NAME = "Theater Snacks Counter"
+# Razorpay Credentials
+RAZORPAY_KEY_ID = 'rzp_test_TWlZep6ltRZtiT'
+RAZORPAY_KEY_SECRET = 'RO5HxMLzIvMn0j0UApvjHxEK'
