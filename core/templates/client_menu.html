@@ -41,6 +41,25 @@
             color: #ffffff;
             border-color: var(--text-dark);
         }
+        .out-of-stock-badge {
+            font-size: 10px;
+            background: #ffebee;
+            color: #c62828;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        .food-card {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .food-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -67,7 +86,7 @@
                 <input type="hidden" name="category" value="{{ current_category }}">
             </form>
 
-            <!-- Category Filter Chips (Horizontally Scrollable / Swipeable) -->
+            <!-- Category Filter Chips -->
             <div class="category-tabs">
                 <a href="?category=ALL&q={{ search_query }}" class="cat-chip {% if current_category == 'ALL' %}active{% endif %}"><i class="fa-solid fa-house"></i> All Items</a>
                 <a href="?category=SNACKS&q={{ search_query }}" class="cat-chip {% if current_category == 'SNACKS' %}active{% endif %}"><i class="fa-solid fa-bowl-food"></i> Snacks</a>
@@ -91,16 +110,23 @@
                         <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                             ₹{{ item.price }} {% if item.unit_spec %}({{ item.unit_spec }}){% endif %}
                         </div>
+                        {% if item.quantity_available <= 0 %}
+                            <span class="out-of-stock-badge">Out of Stock</span>
+                        {% endif %}
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                        <button class="add-btn" id="add-btn-{{ item.id }}" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus"></i></button>
+                        {% if item.quantity_available > 0 %}
+                            <button class="add-btn" id="add-btn-{{ item.id }}" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus"></i></button>
 
-                        <div class="qty-controls" id="qty-ctrl-{{ item.id }}" style="display: none;">
-                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, -1, {{ item.quantity_available }})"><i class="fa-solid fa-minus" style="font-size: 10px;"></i></button>
-                            <span class="qty-count" id="qty-val-{{ item.id }}">0</span>
-                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus" style="font-size: 10px;"></i></button>
-                        </div>
+                            <div class="qty-controls" id="qty-ctrl-{{ item.id }}" style="display: none;">
+                                <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, -1, {{ item.quantity_available }})"><i class="fa-solid fa-minus" style="font-size: 10px;"></i></button>
+                                <span class="qty-count" id="qty-val-{{ item.id }}">0</span>
+                                <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus" style="font-size: 10px;"></i></button>
+                            </div>
+                        {% else %}
+                            <button class="add-btn" disabled style="opacity: 0.4; cursor: not-allowed;"><i class="fa-solid fa-ban"></i></button>
+                        {% endif %}
                     </div>
                 </div>
                 {% empty %}
@@ -171,7 +197,9 @@
             let grandTotal = 0;
             let totalItemsCount = 0;
 
-            document.querySelectorAll('[id^="add-btn-"]').forEach(btn => btn.style.display = 'flex');
+            document.querySelectorAll('[id^="add-btn-"]').forEach(btn => {
+                if (!btn.disabled) btn.style.display = 'flex';
+            });
             document.querySelectorAll('[id^="qty-ctrl-"]').forEach(ctrl => ctrl.style.display = 'none');
 
             for (const [id, item] of Object.entries(cart)) {

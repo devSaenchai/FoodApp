@@ -9,4 +9,8 @@ urlpatterns = [
     path('create-direct-upi-order/', views.create_direct_upi_order, name='create_direct_upi_order'),
     path('verify-payment/', views.verify_razorpay_payment, name='verify_razorpay_payment'),
     path('order-confirmed/<int:order_id>/', views.order_confirmed, name='order_confirmed'),
+
+    #shopkeeper
+    path('theater/<int:theater_id>/shopkeeper/login/', views.shopkeeper_login_view, name='shopkeeper_login'),
+    path('shopkeeper/dashboard/', views.shopkeeper_dashboard_view, name='shopkeeper_dashboard'),
 ]

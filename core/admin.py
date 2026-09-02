@@ -3,8 +3,19 @@ from .models import Theater, FoodItem, Order, OrderItem
 
 @admin.register(Theater)
 class TheaterAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'location')
-    search_fields = ('name', 'location')
+    list_display = ('id', 'name', 'location', 'phone_number')
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        from django.urls import path
+        custom_urls = [
+            path('<int:theater_id>/shopkeeper-login-link/', self.admin_site.admin_view(self.shopkeeper_link_view), name='theater_shopkeeper_link'),
+        ]
+        return custom_urls + urls
+
+    def shopkeeper_link_view(self, request, theater_id):
+        from django.shortcuts import redirect
+        return redirect('shopkeeper_login', theater_id=theater_id)
 
 @admin.register(FoodItem)
 class FoodItemAdmin(admin.ModelAdmin):
@@ -23,3 +34,4 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ('status', 'fulfillment_type', 'payment_method', 'created_at')
     search_fields = ('customer_name', 'customer_phone', 'transaction_id')
     inlines = [OrderItemInline]
+

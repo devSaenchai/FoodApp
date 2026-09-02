@@ -9,56 +9,92 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .order-card {
-            background: #ffffff;
-            border-radius: var(--radius-md);
+            background: #fff;
             padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .order-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .order-details-dropdown {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .order-card.open .order-details-dropdown {
+            display: block;
+        }
+        .order-card.open .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+        .fa-chevron-down {
+            transition: transform 0.2s ease;
         }
     </style>
 </head>
 <body>
     <div class="mobile-frame">
-        <div class="scroll-content">
-            <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <a href="{% url 'client_menu' %}" style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-dark); font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.05);"><i class="fa-solid fa-arrow-left"></i></a>
-                    <div>
-                        <div style="font-size: 24px; font-weight: 900; color: var(--text-dark);">My Orders</div>
-                        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">View your past purchases</div>
-                    </div>
-                </div>
-                <div style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); color: #2e7d32;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <div class="scroll-content" style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                <a href="{% url 'client_menu' %}" style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-dark); box-shadow: 0 2px 6px rgba(0,0,0,0.05);"><i class="fa-solid fa-arrow-left"></i></a>
+                <div style="font-size: 20px; font-weight: 900; color: var(--text-dark);">My Orders</div>
             </div>
 
-            <!-- Orders Container -->
-            <div style="margin-top: 20px;">
-                {% if order_history %}
-                    {% for ord in order_history %}
-                    <div class="order-card">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <strong style="font-size: 15px; color: var(--text-dark);">Order #{{ ord.id }}</strong>
-                            <span style="font-size: 13px; font-weight: 800; color: #2e7d32;">₹{{ ord.total_amount }}</span>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-                            Status: <span style="font-weight: 700; color: var(--text-dark);">{{ ord.get_status_display }}</span> | Type: {{ ord.get_fulfillment_type_display }}
-                        </div>
-                        <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                            <i class="fa-regular fa-calendar-days"></i> {{ ord.created_at|date:"M d, Y, h:i A" }}
-                        </div>
+            {% for order in order_history %}
+            <div class="order-card" onclick="toggleOrderDropdown(this)">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="font-size: 15px; color: var(--text-dark);">Order #{{ order.id }}</strong>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 11px; color: var(--text-muted); margin-left: 6px;"></i>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <!-- Empty state matching reference image -->
-                    <div style="background: #ffffff; border-radius: var(--radius-lg); padding: 50px 20px; text-align: center; margin-top: 30px; box-shadow: 0 6px 16px rgba(0,0,0,0.03);">
-                        <div style="font-size: 40px; margin-bottom: 12px; color: var(--text-muted);"><i class="fa-regular fa-file-lines"></i></div>
-                        <div style="font-size: 16px; font-weight: 800; color: var(--text-dark);">No previous orders found.</div>
-                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.4;">Your order history will appear here once you make a purchase.</div>
+                    <span style="font-size: 15px; font-weight: 900; color: var(--text-dark);">₹{{ order.total_amount }}</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                    Status: <strong style="color: {% if order.status == 'DELIVERED' or order.status == 'CONFIRMED' %}#2e7d32{% else %}#e65100{% endif %};">{{ order.status }}</strong> | Type: {{ order.get_fulfillment_type_display|default:order.fulfillment_type }}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">{{ order.created_at|date:"M d, Y, h:i A" }}</div>
+
+                <!-- Dropdown Details -->
+                <div class="order-details-dropdown" onclick="event.stopPropagation()">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">Ordered Items:</div>
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        {% for item in order.items.all %}
+                        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                            <span style="color: var(--text-dark);">{{ item.food_item.name }} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
+                            <span style="font-weight: 600;">₹{% widthratio item.price 1 item.quantity %}</span>
+                        </div>
+                        {% empty %}
+                        <span style="font-size: 12px; color: var(--text-muted);">No items found.</span>
+                        {% endfor %}
                     </div>
-                {% endif %}
+
+                    {% if order.transaction_id %}
+                    <div style="background: #eafbe3; padding: 8px 10px; border-radius: 8px; font-size: 11px; color: #2e7d32; word-break: break-all; margin-top: 8px;">
+                        <i class="fa-solid fa-shield-check"></i> <strong>Razorpay Txn ID:</strong> {{ order.transaction_id }}
+                    </div>
+                    {% endif %}
+
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 8px; border-top: 1px dashed #eee; padding-top: 6px;">
+                        <span>Payment Method: <strong>{{ order.payment_type|default:order.payment_method|default:"Online" }}</strong></span>
+                        <span>Seat: {{ order.seat_number }}</span>
+                    </div>
+                </div>
             </div>
+            {% empty %}
+            <p style="text-align: center; color: var(--text-muted); margin-top: 40px;">No past orders found.</p>
+            {% endfor %}
         </div>
     </div>
+
+    <script>
+        function toggleOrderDropdown(cardElement) {
+            cardElement.classList.toggle('open');
+        }
+    </script>
 </body>
 </html>

@@ -1,173 +1,296 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,600&display=swap');
+
 :root {
-    --bg-lime: #dbfed4;
     --primary-lime: #76e100;
-    --primary-lime-hover: #65c200;
-    --text-dark: #111111;
+    --bg-gradient: linear-gradient(180deg, #d3f982 0%, #eefcce 35%, #ffffff 100%);
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --text-dark: #121212;
     --text-muted: #666666;
-    --card-bg: #ffffff;
-    --radius-lg: 24px;
-    --radius-md: 16px;
-    --radius-sm: 12px;
+    --radius-lg: 28px;
+    --radius-md: 18px;
 }
 
-body {
-    margin: 0;
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; 
+}
+
+body { 
+    min-height: 100vh; 
+    background: #eef3e2; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
     padding: 0;
-    background-color: #f0f4ec;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-dark);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
 }
 
+/* Mobile Frame Container */
 .mobile-frame {
-    width: 100%;
-    max-width: 414px;
+    width: 100%; 
+    max-width: 410px; 
     height: 100vh;
-    max-height: 896px;
-    background: var(--bg-lime);
+    max-height: 870px;
+    background: var(--bg-gradient);
+    border-radius: 36px; 
+    position: relative; 
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08); 
+    overflow: hidden;
+    animation: frameSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     display: flex;
     flex-direction: column;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
 
-@media(min-width: 415px) {
-    .mobile-frame {
-        border-radius: 40px;
-        border: 8px solid #ffffff;
-        height: 850px;
-    }
-}
-
+/* Scrollable Container inside frame */
 .scroll-content {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 20px;
-    box-sizing: border-box;
+    padding: 24px 20px 100px 20px;
+    -webkit-overflow-scrolling: touch;
 }
+
 .scroll-content::-webkit-scrollbar {
     display: none;
 }
 
-.input-box {
-    width: 100%;
-    background: #ffffff;
-    border: 1px solid #e2e8d5;
-    padding: 14px 18px;
-    border-radius: var(--radius-md);
-    font-size: 15px;
-    color: var(--text-dark);
-    outline: none;
-    box-sizing: border-box;
-    margin-top: 10px;
+/* Typography */
+.app-title { 
+    font-size: 34px; 
+    font-weight: 900; 
+    color: var(--text-dark); 
+    line-height: 1.1; 
+    letter-spacing: -0.02em;
 }
+
+.app-subtitle { 
+    font-family: 'Newsreader', 'Georgia', serif; 
+    font-style: italic; 
+    font-size: 22px; 
+    color: var(--text-dark); 
+    margin-top: 4px; 
+}
+
+/* Inputs */
+.input-box { 
+    width: 100%; 
+    background: #ffffff; 
+    border: 1px solid #e2e8d5; 
+    border-radius: var(--radius-md); 
+    padding: 16px 18px; 
+    font-size: 15px; 
+    outline: none; 
+    margin-top: 8px; 
+    color: var(--text-dark); 
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 .input-box:focus {
     border-color: var(--primary-lime);
+    box-shadow: 0 0 0 3px rgba(118, 225, 0, 0.25);
 }
 
-.primary-btn {
-    width: 100%;
-    background: var(--primary-lime);
-    color: var(--text-dark);
-    border: none;
-    padding: 16px;
-    border-radius: var(--radius-lg);
-    font-size: 16px;
-    font-weight: 800;
-    cursor: pointer;
-    text-align: center;
-    box-shadow: 0 6px 20px rgba(118, 225, 0, 0.3);
-    transition: background 0.2s ease;
+/* Buttons */
+.primary-btn { 
+    width: 100%; 
+    background: var(--primary-lime); 
+    color: var(--text-dark); 
+    border: none; 
+    border-radius: 40px; 
+    padding: 18px; 
+    font-size: 16px; 
+    font-weight: 700; 
+    cursor: pointer; 
+    box-shadow: 0 8px 20px rgba(118, 225, 0, 0.35); 
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease, background-color 0.15s ease;
 }
+
 .primary-btn:hover {
-    background: var(--primary-lime-hover);
+    box-shadow: 0 12px 25px rgba(118, 225, 0, 0.45);
+    transform: translateY(-2px);
 }
 
-.food-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 16px;
+.primary-btn:active {
+    transform: scale(0.95);
 }
 
-.food-card {
-    background: var(--card-bg);
-    border-radius: var(--radius-md);
-    padding: 12px;
+.primary-btn:disabled {
+    background: #ccc;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.add-btn { 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+    background: var(--text-dark); 
+    color: #fff; 
+    border: none; 
+    font-size: 18px; 
+    cursor: pointer; 
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    opacity: 0;
-    transform: translateY(15px);
-    transition: all 0.3s ease;
-}
-.food-card.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.food-img-container {
-    width: 100%;
-    height: 110px;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #f7f7f7;
-    margin-bottom: 8px;
-}
-.food-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.bottom-bar {
-    background: #ffffff;
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    border-top-left-radius: 24px;
-    border-top-right-radius: 24px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    justify-content: center;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease;
 }
 
+.add-btn:active {
+    transform: scale(0.85);
+}
+
+/* Quantity Control Widget */
 .qty-controls {
     display: flex;
     align-items: center;
-    background: #f1f8ed;
-    border-radius: 12px;
-    padding: 4px;
+    background: var(--text-dark);
+    border-radius: 20px;
+    padding: 2px;
 }
+
 .qty-btn {
-    background: #ffffff;
-    border: none;
     width: 28px;
     height: 28px;
-    border-radius: 8px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-.qty-count {
-    padding: 0 10px;
-    font-weight: 700;
-    font-size: 14px;
-}
-.add-btn {
-    background: var(--text-dark);
+    border-radius: 50%;
+    background: transparent;
     color: #ffffff;
     border: none;
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.15s ease;
+}
+
+.qty-btn:active {
+    transform: scale(0.85);
+}
+
+.qty-count {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 8px;
+}
+
+/* Food Grid & Cards */
+.food-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 14px; 
+    margin-top: 18px; 
+}
+
+/* Updated Full Image Card with Border & 50% Bottom White Fade */
+.food-card { 
+    background: #ffffff; 
+    border-radius: var(--radius-lg); 
+    padding: 16px; 
+    position: relative; 
+    min-height: 210px;
+    display: flex; 
+    flex-direction: column; 
+    justify-content: flex-end; 
+    border: 2px solid #ffffff; 
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.food-card.visible {
+    animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.food-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+}
+
+/* Background Image Container */
+.food-img-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.food-img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    transition: transform 0.35s ease;
+}
+
+/* 50% White Gradient Overlay from Bottom */
+.food-img-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.85) 30%, rgba(255, 255, 255, 0) 50%);
+    pointer-events: none;
+}
+
+.food-card:hover .food-img {
+    transform: scale(1.06);
+}
+
+/* Card Text and Action Elements over Image Overlay */
+.food-card > div {
+    position: relative;
+    z-index: 2;
+}
+
+/* Bottom Floating Bar */
+.bottom-bar { 
+    position: absolute; 
+    bottom: 20px; 
+    left: 20px; 
+    right: 20px; 
+    background: #ffffff; 
+    border-radius: 30px; 
+    padding: 12px 24px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+    animation: barSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+    z-index: 10;
+}
+
+/* Keyframes */
+@keyframes frameSlideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes barSlideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardEntrance {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 0;
+        background: var(--bg-gradient);
+    }
+    .mobile-frame {
+        max-width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+    }
 }

@@ -6,6 +6,11 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from .models import Theater, FoodItem, Order, OrderItem
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
+from django.db.models import Sum, Count
+from django.db import transaction
+
 
 def login_view(request):
     seat = request.GET.get('seat') or request.POST.get('seat')
@@ -41,7 +46,8 @@ def client_menu(request):
     category = request.GET.get('category', 'ALL')
     search_query = request.GET.get('q', '')
 
-    items = FoodItem.objects.filter(theater=theater, quantity_available__gt=0)
+    # Show items even if out of stock, so we can display "Out of Stock" labels to users
+    items = FoodItem.objects.filter(theater=theater)
     if category != 'ALL':
         items = items.filter(category=category)
     if search_query:
@@ -77,6 +83,7 @@ def checkout_view(request):
         'theater_name': theater.name if theater else 'Theater'
     })
 
+@transaction.atomic
 def create_direct_upi_order(request):
     if request.method == 'POST':
         try:
@@ -94,9 +101,14 @@ def create_direct_upi_order(request):
             subtotal = 0
             order_items_to_create = []
 
+            # First pass: Validate stock availability and lock items
             for item in items_data:
                 food_item = get_object_or_404(FoodItem, id=item['id'])
                 qty = int(item['qty'])
+                
+                if food_item.quantity_available < qty:
+                    return JsonResponse({'error': f'Sorry, "{food_item.name}" only has {food_item.quantity_available} left in stock.'}, status=400)
+                
                 subtotal += food_item.price * qty
                 order_items_to_create.append((food_item, qty, food_item.price))
 
@@ -107,6 +119,7 @@ def create_direct_upi_order(request):
             if amount_in_paise < 100:
                 return JsonResponse({'error': 'Minimum order amount must be at least ₹1.'}, status=400)
 
+            # Create Order
             order = Order.objects.create(
                 theater=theater,
                 customer_name=customer_name,
@@ -118,8 +131,13 @@ def create_direct_upi_order(request):
                 status='CONFIRMED' if payment_method == 'CASH' else 'PENDING'
             )
 
+            # Create OrderItems and auto-decrement stock
             for food_item, qty, price in order_items_to_create:
                 OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=price)
+                food_item.quantity_available -= qty
+                if food_item.quantity_available < 0:
+                    food_item.quantity_available = 0
+                food_item.save()
 
             if payment_method == 'CASH':
                 return JsonResponse({'status': 'CASH_SUCCESS', 'order_id': order.id})
@@ -177,3 +195,99 @@ def verify_razorpay_payment(request):
 def order_confirmed(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     return render(request, 'order_confirmed.html', {'order': order})
+
+def shopkeeper_login_view(request, theater_id):
+    theater = get_object_or_404(Theater, id=theater_id)
+    error = None
+    
+    if request.method == "POST":
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect('shopkeeper_dashboard')  
+        else:
+            error = "Invalid username or password."
+            
+    return render(request, 'shopkeeper_login.html', {'theater': theater, 'error': error})
+
+@login_required
+def shopkeeper_dashboard_view(request):
+    theater = Theater.objects.first()
+    active_tab = request.GET.get('tab', 'live')
+    
+    # Handle Order Status Update
+    if request.method == 'POST' and 'update_order_status' in request.POST:
+        order_id = request.POST.get('order_id')
+        new_status = request.POST.get('status')
+        order_obj = get_object_or_404(Order, id=order_id, theater=theater)
+        order_obj.status = new_status
+        order_obj.save()
+        return redirect('/shopkeeper/dashboard/?tab=live')
+
+    # Handle Menu Item Actions (Add/Edit/Delete) with Image Support
+    if request.method == 'POST' and 'manage_menu' in request.POST:
+        action = request.POST.get('action')
+        item_id = request.POST.get('item_id')
+        
+        if action == 'delete' and item_id:
+            FoodItem.objects.filter(id=item_id).delete()
+        elif action in ['add', 'edit']:
+            name = request.POST.get('name')
+            category = request.POST.get('category')
+            price = request.POST.get('price')
+            qty = request.POST.get('quantity_available', 0)
+            image = request.FILES.get('image')
+            
+            if action == 'add':
+                item = FoodItem.objects.create(
+                    theater=theater, 
+                    name=name, 
+                    category=category, 
+                    price=price, 
+                    quantity_available=qty
+                )
+                if image:
+                    item.image = image
+                    item.save()
+            elif action == 'edit' and item_id:
+                item = get_object_or_404(FoodItem, id=item_id, theater=theater)
+                item.name = name
+                item.category = category
+                item.price = price
+                item.quantity_available = qty
+                if image:
+                    item.image = image
+                item.save()
+        return redirect('/shopkeeper/dashboard/?tab=menu')
+
+    orders = Order.objects.filter(theater=theater).order_by('-created_at')
+    live_orders = orders.exclude(status='DELIVERED') 
+    
+    today_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    menu_items = FoodItem.objects.filter(theater=theater) if hasattr(FoodItem, 'theater') else FoodItem.objects.all()
+
+    context = {
+        'theater': theater,
+        'active_tab': active_tab,
+        'orders': orders,
+        'live_orders': live_orders,
+        'pending_count': live_orders.count(),
+        'today_revenue': today_revenue,
+        'menu_items': menu_items,
+    }
+    return render(request, 'shopkeeper_dashboard.html', context)
+
+def order_detail_view(request, order_id):
+    if not request.session.get('seat') or not request.session.get('theater_id'):
+        return redirect('login')
+    
+    order = get_object_or_404(Order, id=order_id)
+    order_items = OrderItem.objects.filter(order=order)
+
+    return render(request, 'order_detail.html', {
+        'order': order,
+        'order_items': order_items,
+    })

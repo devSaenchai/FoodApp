@@ -1,0 +1,296 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - {{ theater.name }}</title>
+    <link rel="stylesheet" href="{% static 'css/app_design.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #f4f6f0; margin: 0; padding: 0; width: 100vw; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; color: var(--text-dark); overflow-x: hidden; }
+        .dashboard-container { display: flex; width: 100vw; min-height: 100vh; margin: 0; padding: 0; }
+        .sidebar { width: 260px; min-width: 260px; background: #ffffff; border-right: 1px solid #e2e8d5; display: flex; flex-direction: column; padding: 24px; min-height: 100vh; }
+        .main-content { flex: 1; width: calc(100vw - 260px); padding: 30px; overflow-y: auto; background-color: #f4f6f0; }
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; color: var(--text-muted); text-decoration: none; font-weight: 700; font-size: 14px; margin-bottom: 6px; transition: all 0.2s; }
+        .nav-link.active, .nav-link:hover { background: #f1f8ed; color: #2e7d32; }
+        .data-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8d5; }
+        .data-table th, .data-table td { padding: 14px 18px; text-align: left; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+        .data-table th { background: #fafbf8; font-weight: 800; color: var(--text-muted); font-size: 11px; text-transform: uppercase; }
+        .action-btn { padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12px; border: none; cursor: pointer; }
+        .input-box { width: 100%; border: 1px solid #e2e8d5; border-radius: 8px; padding: 8px 12px; font-size: 14px; background: #fff; }
+        .order-row { cursor: pointer; transition: background 0.15s; }
+        .order-row:hover { background-color: #fafbf8; }
+        .items-row { background: #fcfdfa; display: none; }
+        .items-row.open { display: table-row; }
+    </style>
+    <script>
+        function toggleItems(orderId) {
+            const row = document.getElementById('items-row-' + orderId);
+            if (row) {
+                row.classList.toggle('open');
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div style="font-size: 11px; font-weight: 800; color: #2e7d32; text-transform: uppercase; letter-spacing: 1px;">PORTAL</div>
+            <h2 style="font-size: 18px; font-weight: 900; margin: 4px 0 24px 0;">{{ theater.name }}</h2>
+
+            <div style="flex: 1;">
+                <a href="?tab=live" class="nav-link {% if active_tab == 'live' %}active{% endif %}"><i class="fa-solid fa-chart-pie"></i> Live Orders</a>
+                <a href="?tab=menu" class="nav-link {% if active_tab == 'menu' %}active{% endif %}"><i class="fa-solid fa-utensils"></i> Menu Items</a>
+                <a href="?tab=history" class="nav-link {% if active_tab == 'history' %}active{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Order History</a>
+            </div>
+
+            <a href="{% url 'shopkeeper_login' theater.id %}" class="nav-link" style="color: #c53030;"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        </div>
+
+        <!-- Main Panel Content -->
+        <div class="main-content">
+            {% if active_tab == 'live' %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h1 style="font-size: 24px; font-weight: 900; margin: 0;">Live Orders Dashboard</h1>
+                    <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Click on any order row to view its ordered items.</p>
+                </div>
+            </div>
+
+            <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8d5; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); width: 100%;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer Name</th>
+                            <th>Fulfillment</th>
+                            <th>Amount</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in live_orders %}
+                        <tr class="order-row" onclick="toggleItems('{{ order.id }}')">
+                            <td><strong>#{{ order.id }}</strong> <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted); margin-left: 4px;"></i></td>
+                            <td>{{ order.customer_name|default:"Guest" }}</td>
+                            <td>{% if order.fulfillment_type == 'SEAT' %}Seat {{ order.seat_number }}{% else %}Pickup Counter{% endif %}</td>
+                            <td>₹{{ order.total_amount }}</td>
+                            <td>
+                                <span style="background: #f0f4f8; color: #334155; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; text-transform: uppercase;">
+                                    {{ order.payment_type|default:order.payment_method|default:"ONLINE" }}
+                                </span>
+                            </td>
+                            <td><span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 12px;">{{ order.status|default:"PENDING" }}</span></td>
+                            <td onclick="event.stopPropagation()">
+                                <div style="display: flex; gap: 6px;">
+                                    {% if order.status != 'READY' %}
+                                    <form method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="update_order_status" value="1">
+                                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                                        <input type="hidden" name="status" value="READY">
+                                        <button type="submit" class="action-btn" style="background: #d97706; color: #ffffff;">Order Ready</button>
+                                    </form>
+                                    {% endif %}
+                                    <form method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="update_order_status" value="1">
+                                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                                        <input type="hidden" name="status" value="DELIVERED">
+                                        <button type="submit" class="action-btn" style="background: #2e7d32; color: #ffffff;">Mark Delivered</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Expandable Items Row -->
+                        <tr id="items-row-{{ order.id }}" class="items-row">
+                            <td colspan="7" style="padding: 16px 24px; background: #fafbf8; border-bottom: 2px solid #e2e8d5;">
+                                <div style="font-weight: 800; font-size: 13px; margin-bottom: 8px; color: #2e7d32;">Ordered Items for #{{ order.id }}:</div>
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    {% for item in order.items.all %}
+                                    <div style="display: flex; justify-content: space-between; font-size: 13px; max-width: 500px;">
+                                        <span>{{ item.food_item.name }} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
+                                    </div>
+                                    {% empty %}
+                                    <span style="color: var(--text-muted); font-size: 13px;">No items detail found for this order.</span>
+                                    {% endfor %}
+                                </div>
+                                
+                                {% if order.transaction_id %}
+                                <div style="background: #eafbe3; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #2e7d32; margin-top: 10px; display: inline-block; word-break: break-all;">
+                                    <i class="fa-solid fa-shield-check"></i> <strong>Txn ID:</strong> {{ order.transaction_id }}
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No active incoming orders at the moment.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% elif active_tab == 'history' %}
+            <div style="margin-bottom: 24px;">
+                <h1 style="font-size: 24px; font-weight: 900; margin: 0;">Order History</h1>
+                <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Click on any order row to view its ordered items.</p>
+            </div>
+
+            <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8d5; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); width: 100%;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer Name</th>
+                            <th>Fulfillment</th>
+                            <th>Amount</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr class="order-row" onclick="toggleItems('history-{{ order.id }}')">
+                            <td><strong>#{{ order.id }}</strong> <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted); margin-left: 4px;"></i></td>
+                            <td>{{ order.customer_name|default:"Guest" }}</td>
+                            <td>{% if order.fulfillment_type == 'SEAT' %}Seat {{ order.seat_number }}{% else %}Counter{% endif %}</td>
+                            <td>₹{{ order.total_amount }}</td>
+                            <td>
+                                <span style="background: #f0f4f8; color: #334155; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; text-transform: uppercase;">
+                                    {{ order.payment_type|default:order.payment_method|default:"ONLINE" }}
+                                </span>
+                            </td>
+                            <td><span style="font-weight: 700; color: {% if order.status == 'DELIVERED' %}#2e7d32{% else %}#e65100{% endif %};">{{ order.status|default:"PENDING" }}</span></td>
+                            <td style="color: var(--text-muted);">{{ order.created_at|date:"M d, H:i" }}</td>
+                        </tr>
+                        <tr id="items-row-history-{{ order.id }}" class="items-row">
+                            <td colspan="7" style="padding: 16px 24px; background: #fafbf8; border-bottom: 2px solid #e2e8d5;">
+                                <div style="font-weight: 800; font-size: 13px; margin-bottom: 8px; color: #2e7d32;">Ordered Items for #{{ order.id }}:</div>
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    {% for item in order.items.all %}
+                                    <div style="display: flex; justify-content: space-between; font-size: 13px; max-width: 500px;">
+                                        <span>{{ item.food_item.name }} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
+                                    </div>
+                                    {% empty %}
+                                    <span style="color: var(--text-muted); font-size: 13px;">No items detail found for this order.</span>
+                                    {% endfor %}
+                                </div>
+
+                                {% if order.transaction_id %}
+                                <div style="background: #eafbe3; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #2e7d32; margin-top: 10px; display: inline-block; word-break: break-all;">
+                                    <i class="fa-solid fa-shield-check"></i> <strong>Txn ID:</strong> {{ order.transaction_id }}
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No order history available.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% elif active_tab == 'menu' %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h1 style="font-size: 24px; font-weight: 900; margin: 0;">Menu Inventory Management</h1>
+                    <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Add, modify or remove food items from menu catalogs.</p>
+                </div>
+            </div>
+
+            <!-- Add Item Form -->
+            <div style="background: #ffffff; border-radius: 16px; padding: 20px; border: 1px solid #e2e8d5; margin-bottom: 24px; width: 100%;">
+                <div style="font-size: 15px; font-weight: 800; margin-bottom: 12px;">Add New Menu Item</div>
+                <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1.5fr auto; gap: 10px; width: 100%; align-items: center;">
+                    {% csrf_token %}
+                    <input type="hidden" name="manage_menu" value="1">
+                    <input type="hidden" name="action" value="add">
+                    <input type="text" name="name" class="input-box" placeholder="Item Name" required style="margin: 0; padding: 10px;">
+                    <select name="category" class="input-box" style="margin: 0; padding: 10px;">
+                        <option value="SNACKS">Snacks</option>
+                        <option value="DRINKS">Drinks</option>
+                        <option value="COMBO">Combo</option>
+                    </select>
+                    <input type="number" step="0.01" name="price" class="input-box" placeholder="Price (₹)" required style="margin: 0; padding: 10px;">
+                    <input type="number" name="quantity_available" class="input-box" placeholder="Stock Qty" required style="margin: 0; padding: 10px;">
+                    <input type="file" name="image" class="input-box" accept="image/*" style="margin: 0; padding: 6px; font-size: 12px;">
+                    <button type="submit" class="action-btn" style="background: #2e7d32; color: #fff; padding: 10px 20px;">Add</button>
+                </form>
+            </div>
+
+            <!-- Editable Menu Table -->
+            <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8d5; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); width: 100%;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Price (₹)</th>
+                            <th>Stock</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in menu_items %}
+                        <tr>
+                            <form method="POST" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="hidden" name="manage_menu" value="1">
+                                <input type="hidden" name="action" value="edit">
+                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                <td>
+                                    {% if item.image %}
+                                        <img src="{{ item.image.url }}" alt="{{ item.name }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px;">
+                                    {% else %}
+                                        <span style="font-size: 11px; color: var(--text-muted);">No Image</span>
+                                    {% endif %}
+                                    <input type="file" name="image" accept="image/*" style="font-size: 10px; margin-top: 4px; width: 90px;">
+                                </td>
+                                <td><input type="text" name="name" value="{{ item.name }}" class="input-box" style="padding: 6px 10px; font-size: 13px;" required></td>
+                                <td>
+                                    <select name="category" class="input-box" style="padding: 6px 10px; font-size: 13px;">
+                                        <option value="SNACKS" {% if item.category == 'SNACKS' %}selected{% endif %}>Snacks</option>
+                                        <option value="DRINKS" {% if item.category == 'DRINKS' %}selected{% endif %}>Drinks</option>
+                                        <option value="COMBO" {% if item.category == 'COMBO' %}selected{% endif %}>Combo</option>
+                                    </select>
+                                </td>
+                                <td><input type="number" step="0.01" name="price" value="{{ item.price }}" class="input-box" style="padding: 6px 10px; font-size: 13px;" required></td>
+                                <td><input type="number" name="quantity_available" value="{{ item.quantity_available }}" class="input-box" style="padding: 6px 10px; font-size: 13px;" required></td>
+                                <td>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <button type="submit" class="action-btn" style="background: #2e7d32; color: #fff;" title="Save Edit"><i class="fa-solid fa-check"></i></button>
+                            </form>
+                                        <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this item?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="manage_menu" value="1">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="item_id" value="{{ item.id }}">
+                                            <button type="submit" class="action-btn" style="background: #fde8e8; color: #c53030;" title="Delete Item"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No menu items found. Add items using the form above.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
