@@ -1,43 +1,80 @@
 import json
 import razorpay
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
 from .models import Theater, FoodItem, Order, OrderItem
 
 def login_view(request):
-    seat = request.GET.get('seat') or request.POST.get('seat') or request.session.get('seat', 'default')
-    theater_id = request.GET.get('theater') or request.POST.get('theater') or request.session.get('theater_id', 1)
-    
-    if request.method == 'POST':
-        request.session['customer_name'] = request.POST.get('name')
-        request.session['customer_phone'] = request.POST.get('phone')
+    seat = request.GET.get('seat') or request.POST.get('seat')
+    theater_id = request.GET.get('theater') or request.POST.get('theater')
+
+    if seat and theater_id:
         request.session['seat'] = seat
         request.session['theater_id'] = theater_id
-        return redirect('client_menu')
-    
-    if request.GET.get('seat'):
-        request.session['seat'] = request.GET.get('seat')
-    if request.GET.get('theater'):
-        request.session['theater_id'] = request.GET.get('theater')
 
-    return render(request, 'login.html', {'seat': seat})
+    # Enforce QR code scan requirement
+    if not request.session.get('seat') or not request.session.get('theater_id'):
+        return HttpResponseForbidden("Access Denied: You must scan a valid theater QR code to access this ordering portal.")
+
+    theater = get_object_or_404(Theater, id=request.session.get('theater_id'))
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        phone = request.POST.get('phone')
+        if name and phone:
+            request.session['customer_name'] = name
+            request.session['customer_phone'] = phone
+            return redirect('client_menu')
+
+    return render(request, 'login.html', {'theater': theater, 'seat': request.session.get('seat')})
 
 def client_menu(request):
-    theater_id = request.session.get('theater_id', 1)
-    theater = Theater.objects.filter(id=theater_id).first() or Theater.objects.first()
-    items = FoodItem.objects.filter(theater=theater, quantity_available__gt=0)
+    if not request.session.get('seat') or not request.session.get('theater_id'):
+        return redirect('login')
     
+    theater_id = request.session.get('theater_id')
+    theater = get_object_or_404(Theater, id=theater_id)
+    
+    category = request.GET.get('category', 'ALL')
+    search_query = request.GET.get('q', '')
+
+    items = FoodItem.objects.filter(theater=theater, quantity_available__gt=0)
+    if category != 'ALL':
+        items = items.filter(category=category)
+    if search_query:
+        items = items.filter(Q(name__icontains=search_query) | Q(unit_spec__icontains=search_query))
+
     return render(request, 'client_menu.html', {
         'items': items, 
         'theater': theater,
-        'seat': request.session.get('seat', 'default')
+        'seat': request.session.get('seat'),
+        'customer_name': request.session.get('customer_name'),
+        'current_category': category,
+        'search_query': search_query
+    })
+
+def my_orders_view(request):
+    if not request.session.get('seat') or not request.session.get('theater_id'):
+        return redirect('login')
+    
+    customer_phone = request.session.get('customer_phone')
+    order_history = Order.objects.filter(customer_phone=customer_phone).order_by('-created_at') if customer_phone else []
+
+    return render(request, 'my_orders.html', {
+        'order_history': order_history,
+        'customer_phone': customer_phone
     })
 
 def checkout_view(request):
+    if not request.session.get('seat') or not request.session.get('theater_id'):
+        return redirect('login')
+    theater = Theater.objects.filter(id=request.session.get('theater_id')).first()
     return render(request, 'checkout.html', {
-        'seat': request.session.get('seat', 'default')
+        'seat': request.session.get('seat', 'default'),
+        'theater_name': theater.name if theater else 'Theater'
     })
 
 def create_direct_upi_order(request):
@@ -49,7 +86,7 @@ def create_direct_upi_order(request):
             fulfillment_type = data.get('fulfillment_type', 'SEAT')
             
             theater_id = request.session.get('theater_id', 1)
-            theater = Theater.objects.filter(id=theater_id).first() or Theater.objects.first()
+            theater = get_object_or_404(Theater, id=theater_id)
             customer_name = request.session.get('customer_name', 'Guest')
             customer_phone = request.session.get('customer_phone', '0000000000')
             seat_number = request.session.get('seat', 'default')
@@ -67,7 +104,6 @@ def create_direct_upi_order(request):
             total_amount = subtotal + delivery_fee
             amount_in_paise = int(total_amount * 100)
 
-            # Minimum amount check (100 paise = ₹1)
             if amount_in_paise < 100:
                 return JsonResponse({'error': 'Minimum order amount must be at least ₹1.'}, status=400)
 
@@ -88,17 +124,13 @@ def create_direct_upi_order(request):
             if payment_method == 'CASH':
                 return JsonResponse({'status': 'CASH_SUCCESS', 'order_id': order.id})
 
-            # Initialize Razorpay Client
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-            
-            razorpay_data = {
+            razorpay_order = client.order.create({
                 "amount": amount_in_paise,
                 "currency": "INR",
                 "receipt": f"order_rcptid_{order.id}",
                 "payment_capture": 1
-            }
-            
-            razorpay_order = client.order.create(data=razorpay_data)
+            })
             
             order.razorpay_order_id = razorpay_order['id']
             order.save()
@@ -124,21 +156,13 @@ def verify_razorpay_payment(request):
             razorpay_signature = data.get('razorpay_signature')
             order_id = data.get('order_id')
 
-            if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id]):
-                return JsonResponse({'status': 'FAILURE', 'error': 'Missing payment fields'}, status=400)
-
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-            
-            # Verify signature using Razorpay utility
-            params_dict = {
+            client.utility.verify_payment_signature({
                 'razorpay_order_id': razorpay_order_id,
                 'razorpay_payment_id': razorpay_payment_id,
                 'razorpay_signature': razorpay_signature
-            }
-            
-            client.utility.verify_payment_signature(params_dict)
+            })
 
-            # If signature verification succeeds, update order status
             order = get_object_or_404(Order, id=order_id)
             order.transaction_id = razorpay_payment_id
             order.status = 'CONFIRMED'
@@ -146,22 +170,9 @@ def verify_razorpay_payment(request):
             order.save()
 
             return JsonResponse({'status': 'SUCCESS', 'order_id': order.id})
-        
-        except razorpay.errors.SignatureVerificationError:
-            return JsonResponse({'status': 'FAILURE', 'error': 'Signature verification failed'}, status=400)
         except Exception as e:
-            return JsonResponse({'status': 'FAILURE', 'error': str(e)}, status=500)
-            
+            return JsonResponse({'status': 'FAILURE', 'error': str(e)}, status=400)
     return HttpResponseBadRequest("Invalid request method")
-
-def verify_upi_utr(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
-    if request.method == 'POST':
-        order.status = 'CONFIRMED'
-        order.is_paid = True
-        order.save()
-        return JsonResponse({'status': 'SUCCESS', 'order_id': order.id})
-    return JsonResponse({'status': 'FAILURE', 'error': 'Invalid request method'}, status=400)
 
 def order_confirmed(request, order_id):
     order = get_object_or_404(Order, id=order_id)

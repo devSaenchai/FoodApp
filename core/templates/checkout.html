@@ -4,25 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Checkout - {{ seat|default:"default" }}</title>
+    <title>Your Cart - Checkout</title>
     <link rel="stylesheet" href="{% static 'css/app_design.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .back-btn {
-            text-decoration: none;
-            color: var(--text-dark);
-            font-size: 24px;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-        }
         .cart-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: #ffffff;
             border-radius: var(--radius-md);
-            padding: 14px 16px;
-            margin-bottom: 10px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
         }
         .option-group {
@@ -51,69 +44,81 @@
             color: var(--text-muted);
             margin-bottom: 6px;
         }
-        .input-box {
-            width: 100%;
-            box-sizing: border-box;
-        }
     </style>
-    <!-- Load Razorpay Checkout Script -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
     {% csrf_token %}
     <div class="mobile-frame">
         <div class="scroll-content">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <a href="{% url 'client_menu' %}" class="back-btn">&larr;</a>
-                <div class="app-title" style="font-size: 30px;">Your Cart</div>
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <a href="{% url 'client_menu' %}" style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-dark); font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.05);"><i class="fa-solid fa-arrow-left"></i></a>
+                    <div>
+                        <div style="font-size: 24px; font-weight: 900; color: var(--text-dark);">Your Cart</div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Review items & select delivery</div>
+                    </div>
+                </div>
+                <div style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); color: #2e7d32;"><i class="fa-solid fa-bag-shopping"></i></div>
             </div>
 
-            <div id="cart-list" style="margin-top: 18px;"></div>
+            <!-- Cart Items Container -->
+            <div id="cart-list" style="margin-top: 16px;"></div>
 
-            <!-- Fulfillment Selection -->
-            <div style="margin-top: 20px;">
-                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Delivery Option</label>
+            <!-- Fulfillment Option -->
+            <div style="margin-top: 18px;">
+                <label style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px;">FULFILLMENT OPTION</label>
                 <div class="option-group">
                     <div class="option-card selected" id="opt-seat" onclick="setFulfillment('SEAT')">
-                        <div style="font-size: 20px;">💺</div>
-                        <strong style="font-size: 13px; display: block; color: var(--text-dark);">Deliver to Seat</strong>
-                        <span style="font-size: 11px; color: var(--text-muted);">+₹10 Fee</span>
+                        <div style="font-size: 16px; color: #2e7d32;"><i class="fa-solid fa-chair"></i></div>
+                        <strong style="font-size: 12px; display: block; color: var(--text-dark); margin-top: 4px;">Deliver to Seat</strong>
+                        <span style="font-size: 10px; color: var(--text-muted);">+₹10 Service Fee</span>
                     </div>
-                    <div class="option-card" id="opt-takeaway" onclick="setFulfillment('TAKEAWAY')">
-                        <div style="font-size: 20px;">🍿</div>
-                        <strong style="font-size: 13px; display: block; color: var(--text-dark);">Takeaway</strong>
-                        <span style="font-size: 11px; color: #2e7d32; font-weight: 600;">Free</span>
+                    <div class="option-card" id="opt-takeaway" onclick="setFulfillment('COUNTER')">
+                        <div style="font-size: 16px; color: #2e7d32;"><i class="fa-solid fa-store"></i></div>
+                        <strong style="font-size: 12px; display: block; color: var(--text-dark); margin-top: 4px;">Counter Pickup</strong>
+                        <span style="font-size: 10px; color: #2e7d32; font-weight: 600;">Free</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Payment Method Selection -->
-            <div style="margin-top: 20px;">
-                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Payment Method</label>
-                <select id="payment-method" class="input-box" style="margin-top: 6px;">
-                    <option value="ONLINE">Pay via Razorpay (UPI / Cards / NetBanking)</option>
-                    <option value="CASH">Pay Cash on Delivery</option>
-                </select>
+            <!-- Payment Method -->
+            <div style="margin-top: 16px;">
+                <label style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px;">PAYMENT METHOD</label>
+                <div class="option-group">
+                    <div class="option-card selected" id="pay-online" onclick="setPayment('ONLINE')">
+                        <div style="font-size: 16px; color: #2e7d32;"><i class="fa-solid fa-credit-card"></i></div>
+                        <strong style="font-size: 12px; display: block; color: var(--text-dark); margin-top: 4px;">Online / UPI</strong>
+                        <span style="font-size: 10px; color: var(--text-muted);">Instant Razorpay</span>
+                    </div>
+                    <div class="option-card" id="pay-cash" onclick="setPayment('CASH')">
+                        <div style="font-size: 16px; color: #2e7d32;"><i class="fa-solid fa-money-bill-wave"></i></div>
+                        <strong style="font-size: 12px; display: block; color: var(--text-dark); margin-top: 4px;">Cash at Counter</strong>
+                        <span style="font-size: 10px; color: var(--text-muted);">Pay on pickup</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- Total Breakup -->
-            <div style="margin-top: 24px; background: #fff; padding: 16px; border-radius: var(--radius-md);">
+            <!-- Order Summary -->
+            <div style="margin-top: 18px; background: #fff; padding: 16px; border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.8px;">ORDER SUMMARY</div>
                 <div class="summary-row">
                     <span>Items Subtotal</span>
                     <span id="subtotal-amount">₹0.00</span>
                 </div>
-                <div class="summary-row">
-                    <span>Delivery Charge</span>
+                <div class="summary-row" id="delivery-row">
+                    <span id="delivery-label">Delivery Fee (Seat)</span>
                     <span id="delivery-amount">₹10.00</span>
                 </div>
-                <hr style="border-color: #eee; margin: 10px 0;">
+                <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 10px 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Total Amount</span>
-                    <span style="font-size: 22px; font-weight: 900; color: var(--text-dark);" id="grand-total">₹0.00</span>
+                    <span style="font-size: 15px; font-weight: 800; color: var(--text-dark);">Total Amount</span>
+                    <span style="font-size: 20px; font-weight: 900; color: var(--text-dark);" id="grand-total">₹0.00</span>
                 </div>
             </div>
 
-            <button class="primary-btn" id="pay-btn" onclick="processOrder()" style="margin-top: 20px;">Place Order &rarr;</button>
+            <button class="primary-btn" id="pay-btn" onclick="processOrder()" style="margin-top: 20px; border-radius: 20px; margin-bottom: 20px;"><i class="fa-solid fa-lock"></i> Place Order Securely</button>
         </div>
     </div>
 
@@ -126,14 +131,22 @@
         }
 
         let selectedFulfillment = 'SEAT';
+        let selectedPayment = 'ONLINE';
 
         document.addEventListener("DOMContentLoaded", renderCart);
 
         function setFulfillment(type) {
             selectedFulfillment = type;
             document.getElementById('opt-seat').classList.toggle('selected', type === 'SEAT');
-            document.getElementById('opt-takeaway').classList.toggle('selected', type === 'TAKEAWAY');
+            document.getElementById('opt-takeaway').classList.toggle('selected', type === 'COUNTER');
+            document.getElementById('delivery-label').innerText = type === 'SEAT' ? 'Delivery Fee (Seat)' : 'Counter Pickup Fee';
             renderCart();
+        }
+
+        function setPayment(method) {
+            selectedPayment = method;
+            document.getElementById('pay-online').classList.toggle('selected', method === 'ONLINE');
+            document.getElementById('pay-cash').classList.toggle('selected', method === 'CASH');
         }
 
         function renderCart() {
@@ -143,7 +156,13 @@
 
             const items = Object.values(cart).filter(i => i.qty > 0);
             if (items.length === 0) {
-                container.innerHTML = '<p style="color: var(--text-muted); margin-top: 20px; text-align: center;">Your cart is empty</p>';
+                container.innerHTML = `
+                    <div style="background: #fff; border-radius: var(--radius-md); padding: 30px 20px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                        <div style="font-size: 32px; margin-bottom: 8px; color: var(--text-muted);"><i class="fa-solid fa-cart-arrow-down"></i></div>
+                        <div style="font-weight: 800; color: var(--text-dark); font-size: 15px;">Your cart is empty.</div>
+                        <a href="{% url 'client_menu' %}" style="display: inline-block; margin-top: 8px; color: #2e7d32; font-weight: 700; text-decoration: none; font-size: 13px;">Go back to Menu</a>
+                    </div>
+                `;
                 document.getElementById('subtotal-amount').innerText = '₹0.00';
                 document.getElementById('delivery-amount').innerText = '₹0.00';
                 document.getElementById('grand-total').innerText = '₹0.00';
@@ -158,13 +177,13 @@
                 container.innerHTML += `
                     <div class="cart-item">
                         <div>
-                            <strong style="font-size: 15px; color: var(--text-dark);">${item.name}</strong>
-                            <div style="font-size: 13px; color: var(--text-muted);">₹${item.price} x ${item.qty}</div>
+                            <strong style="font-size: 14px; color: var(--text-dark);">${item.name}</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">₹${item.price} x ${item.qty}</div>
                         </div>
                         <div class="qty-controls">
-                            <button class="qty-btn" onclick="updateQty(${item.id}, -1)">&minus;</button>
+                            <button class="qty-btn" onclick="updateQty(${item.id}, -1)"><i class="fa-solid fa-minus" style="font-size: 10px;"></i></button>
                             <span class="qty-count">${item.qty}</span>
-                            <button class="qty-btn" onclick="updateQty(${item.id}, 1)">&#43;</button>
+                            <button class="qty-btn" onclick="updateQty(${item.id}, 1)"><i class="fa-solid fa-plus" style="font-size: 10px;"></i></button>
                         </div>
                     </div>
                 `;
@@ -192,7 +211,6 @@
             const items = Object.values(cart).filter(i => i.qty > 0).map(i => ({ id: i.id, qty: i.qty }));
             if (items.length === 0) return alert('Your cart is empty!');
 
-            const method = document.getElementById('payment-method').value;
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
             const response = await fetch("{% url 'create_direct_upi_order' %}", {
@@ -203,7 +221,7 @@
                 },
                 body: JSON.stringify({ 
                     items: items, 
-                    payment_method: method,
+                    payment_method: selectedPayment,
                     fulfillment_type: selectedFulfillment
                 })
             });
@@ -227,7 +245,6 @@
                     "description": "Seat Food & Snacks Order",
                     "order_id": data.razorpay_order_id,
                     "handler": async function (response){
-                        // Send payment details to verify endpoint
                         const verifyRes = await fetch("{% url 'verify_razorpay_payment' %}", {
                             method: "POST",
                             headers: {
@@ -256,15 +273,10 @@
                         }
                     },
                     "theme": {
-                        "color": "#3399cc"
+                        "color": "#76e100"
                     }
                 };
                 var rzp1 = new Razorpay(options);
-                
-                rzp1.on('payment.failed', function (response){
-                    alert("Payment failed: " + response.error.description);
-                });
-
                 rzp1.open();
             }
         }

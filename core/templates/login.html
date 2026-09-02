@@ -3,37 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Order Food</title>
+    <title>Order Food - {{ theater.name }}</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/app_design.css' %}">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .input-icon-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .input-icon-wrapper::before {
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .input-icon-user::before {
+            content: "\f007";
+            font-weight: 400;
+        }
+        .input-icon-phone::before {
+            content: "\f095";
+        }
+        /* Modal Overlay Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #ffffff;
+            width: 85%;
+            max-width: 320px;
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <div class="mobile-frame">
-        <div class="scroll-content" style="display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-                <div style="margin-top: 40px;">
-                    <h1 class="app-title">Order Food</h1>
-                    <div class="app-subtitle">Anytime Anywhere</div>
+        <div class="scroll-content">
+            <!-- Header Section -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h1 style="font-size: 32px; font-weight: 900; margin: 0; color: var(--text-dark); letter-spacing: -0.5px;">Order Food</h1>
+                    <div style="font-size: 18px; font-style: italic; font-weight: 600; color: #2e7d32; margin-top: 2px;">Anytime Anywhere</div>
+                    <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.4;">Order from your seat,<br>Pick up, and Enjoy!</div>
                 </div>
-                <div style="margin-top: 30px; background: rgba(255,255,255,0.7); padding: 10px 16px; border-radius: 20px; display: inline-block;">
-                    📍 <span style="font-weight: 600; font-size: 14px;">Seat: {{ seat|default:"default" }}</span>
+                <div style="font-size: 36px; margin-top: 4px; color: var(--primary-lime-hover);"><i class="fa-solid fa-burger"></i></div>
+            </div>
+
+            <!-- Seat Badge Card -->
+            <div style="background: #ffffff; border-radius: var(--radius-md); padding: 14px 18px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="background: #f1f8ed; padding: 12px 14px; border-radius: 12px; color: #2e7d32; font-size: 16px;"><i class="fa-solid fa-chair"></i></div>
+                    <div>
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">YOUR SEAT</div>
+                        <div style="font-size: 18px; font-weight: 800; color: var(--text-dark);">{{ seat }}</div>
+                    </div>
+                </div>
+                <span onclick="openSeatModal()" style="font-size: 13px; font-weight: 700; color: #2e7d32; cursor: pointer;">Change <i class="fa-solid fa-pen-to-square"></i></span>
+            </div>
+
+            <!-- Theater Details Card -->
+            <div style="background: #ffffff; border-radius: var(--radius-md); padding: 16px; margin-top: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="color: #2e7d32;"><i class="fa-solid fa-film"></i></span>
+                        <strong style="font-size: 16px; color: var(--text-dark);">{{ theater.name }}</strong>
+                        <span style="color: #2e7d32; font-size: 14px;"><i class="fa-solid fa-circle-check"></i></span>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-location-dot"></i> {{ theater.location|default:"Pullpally, Wayanad, Kerala 682032" }}
+                </div>
+                <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 12px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
+                    <span><i class="fa-regular fa-clock"></i> {{ theater.operating_hours|default:"10:00 AM - 11:30 PM" }}</span>
+                    <span><i class="fa-solid fa-phone"></i> {{ theater.phone_number|default:"0484 123 4567" }}</span>
                 </div>
             </div>
 
-            <form method="POST" action="{% url 'login' %}" style="margin-bottom: 20px;">
-                {% csrf_token %}
-                <input type="hidden" name="seat" value="{{ seat|default:'default' }}">
-                <input type="hidden" name="theater" value="{{ request.GET.theater|default:'1' }}">
-                
-                <input type="text" name="name" class="input-box" placeholder="Your Name" required>
-                <input type="tel" name="phone" class="input-box" placeholder="Phone Number" required style="margin-bottom: 20px;">
-                <button type="submit" class="primary-btn">Get Started ➔</button>
-            </form>
+            <!-- Login Form Card -->
+            <div style="background: #ffffff; border-radius: var(--radius-lg); padding: 20px; margin-top: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.04);">
+                <div style="font-size: 16px; font-weight: 800; color: var(--text-dark);">Let's get started</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Enter your details to continue</div>
+
+                <form method="POST" action="{% url 'login' %}" style="margin-top: 14px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="seat" id="form-seat-input" value="{{ seat }}">
+                    <input type="hidden" name="theater" value="{{ theater.id }}">
+                    
+                    <div class="input-icon-wrapper input-icon-user">
+                        <input type="text" name="name" class="input-box" placeholder="Your Name" required style="padding-left: 44px; margin-top: 0;">
+                    </div>
+                    
+                    <div class="input-icon-wrapper input-icon-phone" style="margin-bottom: 16px;">
+                        <input type="tel" name="phone" class="input-box" placeholder="Phone Number" required style="padding-left: 44px; margin-top: 0;">
+                    </div>
+
+                    <button type="submit" class="primary-btn">Get Started &nbsp;<i class="fa-solid fa-arrow-right"></i></button>
+                </form>
+            </div>
+
+            <!-- How It Works Section -->
+            <div style="margin-top: 24px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">HOW IT WORKS</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                    <div style="background: #fff; padding: 12px 4px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                        <div style="font-size: 15px; color: #2e7d32;"><i class="fa-solid fa-utensils"></i></div>
+                        <div style="font-size: 10px; font-weight: 700; margin-top: 6px;">1. Order</div>
+                    </div>
+                    <div style="background: #fff; padding: 12px 4px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                        <div style="font-size: 15px; color: #2e7d32;"><i class="fa-solid fa-credit-card"></i></div>
+                        <div style="font-size: 10px; font-weight: 700; margin-top: 6px;">2. Pay</div>
+                    </div>
+                    <div style="background: #fff; padding: 12px 4px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                        <div style="font-size: 15px; color: #2e7d32;"><i class="fa-solid fa-bell-concierge"></i></div>
+                        <div style="font-size: 10px; font-weight: 700; margin-top: 6px;">3. Ready</div>
+                    </div>
+                    <div style="background: #fff; padding: 12px 4px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                        <div style="font-size: 15px; color: #2e7d32;"><i class="fa-solid fa-box-open"></i></div>
+                        <div style="font-size: 10px; font-weight: 700; margin-top: 6px;">4. Pick Up</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer tagline -->
+            <div style="background: #ffffff; border-radius: var(--radius-md); padding: 12px; margin-top: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02); margin-bottom: 20px;">
+                <div style="font-size: 12px; font-weight: 800; color: var(--text-dark);"><i class="fa-solid fa-shield-halved" style="color:#2e7d32;"></i> Safe • Fast • Contactless</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Designed for a better movie experience.</div>
+            </div>
         </div>
     </div>
+
+    <!-- Change Seat Modal Popup -->
+    <div id="seatModal" class="modal-overlay">
+        <div class="modal-content">
+            <div style="font-size: 18px; font-weight: 900; color: var(--text-dark); margin-bottom: 4px;">Change Your Seat</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">Enter your new seat number below</div>
+            
+            <input type="text" id="newSeatInput" class="input-box" placeholder="e.g. B4" value="{{ seat }}" style="margin-top: 0; text-align: center; font-weight: bold;">
+            
+            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                <button type="button" onclick="closeSeatModal()" style="flex: 1; padding: 12px; border-radius: 16px; background: #f0f0f0; border: none; font-weight: 700; color: var(--text-dark); cursor: pointer;">Cancel</button>
+                <button type="button" onclick="saveNewSeat()" style="flex: 1; padding: 12px; border-radius: 16px; background: var(--primary-lime); border: none; font-weight: 700; color: var(--text-dark); cursor: pointer;">Update</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        localStorage.removeItem('cart');
         localStorage.removeItem('theater_cart');
+
+        function openSeatModal() {
+            document.getElementById('seatModal').style.display = 'flex';
+        }
+
+        function closeSeatModal() {
+            document.getElementById('seatModal').style.display = 'none';
+        }
+
+        function saveNewSeat() {
+            const newSeatVal = document.getElementById('newSeatInput').value.trim();
+            if (!newSeatVal) {
+                alert('Please enter a valid seat number.');
+                return;
+            }
+            // Update the display label
+            document.querySelector('.mobile-frame .scroll-content div:nth-child(2) div:nth-child(1) div:nth-child(2) div:nth-last-child(1)').innerText = newSeatVal;
+            // Update the hidden form input
+            document.getElementById('form-seat-input').value = newSeatVal;
+            closeSeatModal();
+        }
     </script>
 </body>
 </html>

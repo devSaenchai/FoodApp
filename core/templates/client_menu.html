@@ -6,13 +6,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{{ theater.name }} - Menu</title>
     <link rel="stylesheet" href="{% static 'css/app_design.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-top: 14px;
+            padding-bottom: 6px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            white-space: nowrap;
+        }
+        .category-tabs::-webkit-scrollbar {
+            display: none;
+        }
+        .cat-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: #ffffff;
+            border: 1px solid #e2e8d5;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dark);
+            text-decoration: none;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .cat-chip.active {
+            background: var(--text-dark);
+            color: #ffffff;
+            border-color: var(--text-dark);
+        }
+    </style>
 </head>
 <body>
     <div class="mobile-frame">
         <div class="scroll-content">
-            <div class="app-title">Fresh Snacks</div>
-            <div class="app-subtitle">Delivered to Seat {{ seat }}</div>
+            <!-- Top Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <a href="{% url 'login' %}" style="background: #ffffff; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-dark); font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.05);"><i class="fa-solid fa-arrow-left"></i></a>
+                    <div>
+                        <div style="font-size: 24px; font-weight: 900; color: var(--text-dark);">Menu</div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Seat: {{ seat }} | {{ customer_name }}</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="toggleSearch()" style="background: #ffffff; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); color: var(--text-dark);"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    <a href="{% url 'my_orders' %}" style="background: #ffffff; border: none; width: 38px; height: 38px; border-radius: 50%; text-decoration: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); color: var(--text-dark);"><i class="fa-solid fa-clock-rotate-left"></i></a>
+                </div>
+            </div>
 
+            <!-- Search Bar -->
+            <form id="search-form" method="GET" action="{% url 'client_menu' %}" style="display: {% if search_query %}block{% else %}none{% endif %}; margin-top: 14px;">
+                <input type="text" name="q" value="{{ search_query }}" class="input-box" placeholder="Search popcorn, beverages..." style="margin-top: 0; padding: 12px 16px;">
+                <input type="hidden" name="category" value="{{ current_category }}">
+            </form>
+
+            <!-- Category Filter Chips (Horizontally Scrollable / Swipeable) -->
+            <div class="category-tabs">
+                <a href="?category=ALL&q={{ search_query }}" class="cat-chip {% if current_category == 'ALL' %}active{% endif %}"><i class="fa-solid fa-house"></i> All Items</a>
+                <a href="?category=SNACKS&q={{ search_query }}" class="cat-chip {% if current_category == 'SNACKS' %}active{% endif %}"><i class="fa-solid fa-bowl-food"></i> Snacks</a>
+                <a href="?category=DRINKS&q={{ search_query }}" class="cat-chip {% if current_category == 'DRINKS' %}active{% endif %}"><i class="fa-solid fa-cup-straw"></i> Drinks</a>
+                <a href="?category=COMBO&q={{ search_query }}" class="cat-chip {% if current_category == 'COMBO' %}active{% endif %}"><i class="fa-solid fa-gift"></i> Combos</a>
+            </div>
+
+            <!-- Food Grid -->
             <div class="food-grid">
                 {% for item in items %}
                 <div class="food-card">
@@ -24,37 +87,46 @@
                         {% endif %}
                     </div>
                     <div>
-                        <strong style="font-size: 15px; color: var(--text-dark);">{{ item.name }}</strong>
-                        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+                        <strong style="font-size: 14px; color: var(--text-dark); display: block; line-height: 1.2;">{{ item.name }}</strong>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                             ₹{{ item.price }} {% if item.unit_spec %}({{ item.unit_spec }}){% endif %}
                         </div>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                        <button class="add-btn" id="add-btn-{{ item.id }}" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})">+</button>
+                        <button class="add-btn" id="add-btn-{{ item.id }}" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus"></i></button>
 
                         <div class="qty-controls" id="qty-ctrl-{{ item.id }}" style="display: none;">
-                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, -1, {{ item.quantity_available }})">&minus;</button>
+                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, -1, {{ item.quantity_available }})"><i class="fa-solid fa-minus" style="font-size: 10px;"></i></button>
                             <span class="qty-count" id="qty-val-{{ item.id }}">0</span>
-                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})">&#43;</button>
+                            <button class="qty-btn" onclick="updateQty({{ item.id }}, '{{ item.name|escapejs }}', {{ item.price }}, 1, {{ item.quantity_available }})"><i class="fa-solid fa-plus" style="font-size: 10px;"></i></button>
                         </div>
                     </div>
                 </div>
                 {% empty %}
-                <p style="grid-column: span 2; color: var(--text-muted); margin-top: 20px;">No items available right now.</p>
+                <p style="grid-column: span 2; color: var(--text-muted); margin-top: 30px; text-align: center; font-size: 14px;">No items found matching your criteria.</p>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- Floating Bottom Checkout Bar -->
         <div class="bottom-bar">
-            <span style="font-weight: 700; color: var(--text-dark); font-size: 18px;" id="total-price">₹0.00</span>
-            <a href="{% url 'checkout' %}" class="primary-btn" style="width: auto; padding: 10px 20px; font-size: 14px; text-decoration: none;">Checkout &rarr;</a>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="background: #eafbe3; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; color: #2e7d32;">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span id="cart-badge" style="position: absolute; top: -4px; right: -4px; background: #2e7d32; color: #fff; font-size: 10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; box-sizing: border-box;">0</span>
+                </div>
+                <div>
+                    <div style="font-weight: 900; color: var(--text-dark); font-size: 16px;" id="total-price">₹0.00</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">View Cart <i class="fa-solid fa-angle-up"></i></div>
+                </div>
+            </div>
+            <a href="{% url 'checkout' %}" class="primary-btn" style="width: auto; padding: 12px 20px; font-size: 14px; text-decoration: none; border-radius: 16px; box-shadow: none;">Checkout &nbsp;<i class="fa-solid fa-arrow-right"></i></a>
         </div>
     </div>
 
     <script>
         let cart = {};
-
         try {
             cart = JSON.parse(localStorage.getItem('theater_cart') || '{}');
         } catch (e) {
@@ -64,10 +136,15 @@
         document.addEventListener("DOMContentLoaded", () => {
             const cards = document.querySelectorAll('.food-card');
             cards.forEach((card, index) => {
-                setTimeout(() => card.classList.add('visible'), index * 80);
+                setTimeout(() => card.classList.add('visible'), index * 50);
             });
             syncCartUI();
         });
+
+        function toggleSearch() {
+            const form = document.getElementById('search-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
 
         function updateQty(id, name, price, change, maxStock) {
             const key = String(id);
@@ -92,6 +169,7 @@
 
         function syncCartUI() {
             let grandTotal = 0;
+            let totalItemsCount = 0;
 
             document.querySelectorAll('[id^="add-btn-"]').forEach(btn => btn.style.display = 'flex');
             document.querySelectorAll('[id^="qty-ctrl-"]').forEach(ctrl => ctrl.style.display = 'none');
@@ -108,9 +186,11 @@
                 }
 
                 grandTotal += item.price * item.qty;
+                totalItemsCount += item.qty;
             }
 
             document.getElementById('total-price').innerText = `₹${grandTotal.toFixed(2)}`;
+            document.getElementById('cart-badge').innerText = totalItemsCount;
         }
     </script>
 </body>
