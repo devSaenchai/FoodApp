@@ -254,15 +254,14 @@
                             body: JSON.stringify({
                                 razorpay_order_id: response.razorpay_order_id,
                                 razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                                order_id: data.order_id
+                                razorpay_signature: response.razorpay_signature
                             })
                         });
 
                         const verifyData = await verifyRes.json();
                         if (verifyRes.ok && verifyData.status === "SUCCESS") {
                             localStorage.removeItem('theater_cart');
-                            window.location.href = `/order-confirmed/${data.order_id}/`;
+                            window.location.href = `/order-confirmed/${verifyData.order_id}/`;
                         } else {
                             alert("Payment verification failed: " + (verifyData.error || "Unknown error"));
                         }

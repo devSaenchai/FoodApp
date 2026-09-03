@@ -4,12 +4,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
-from .models import Theater, FoodItem, Order, OrderItem
+from django.db.models import Q, Sum
+from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from django.db.models import Sum, Count
-from django.db import transaction
+from .models import Theater, FoodItem, Order, OrderItem
 
 
 def login_view(request):
@@ -36,6 +35,7 @@ def login_view(request):
 
     return render(request, 'login.html', {'theater': theater, 'seat': request.session.get('seat')})
 
+
 def client_menu(request):
     if not request.session.get('seat') or not request.session.get('theater_id'):
         return redirect('login')
@@ -46,7 +46,6 @@ def client_menu(request):
     category = request.GET.get('category', 'ALL')
     search_query = request.GET.get('q', '')
 
-    # Show items even if out of stock, so we can display "Out of Stock" labels to users
     items = FoodItem.objects.filter(theater=theater)
     if category != 'ALL':
         items = items.filter(category=category)
@@ -62,17 +61,19 @@ def client_menu(request):
         'search_query': search_query
     })
 
+
 def my_orders_view(request):
     if not request.session.get('seat') or not request.session.get('theater_id'):
         return redirect('login')
     
     customer_phone = request.session.get('customer_phone')
-    order_history = Order.objects.filter(customer_phone=customer_phone).order_by('-created_at') if customer_phone else []
+    order_history = Order.objects.filter(customer_phone=customer_phone).exclude(status='PENDING').order_by('-created_at') if customer_phone else []
 
     return render(request, 'my_orders.html', {
         'order_history': order_history,
         'customer_phone': customer_phone
     })
+
 
 def checkout_view(request):
     if not request.session.get('seat') or not request.session.get('theater_id'):
@@ -82,6 +83,7 @@ def checkout_view(request):
         'seat': request.session.get('seat', 'default'),
         'theater_name': theater.name if theater else 'Theater'
     })
+
 
 @transaction.atomic
 def create_direct_upi_order(request):
@@ -99,9 +101,6 @@ def create_direct_upi_order(request):
             seat_number = request.session.get('seat', 'default')
 
             subtotal = 0
-            order_items_to_create = []
-
-            # First pass: Validate stock availability and lock items
             for item in items_data:
                 food_item = get_object_or_404(FoodItem, id=item['id'])
                 qty = int(item['qty'])
@@ -109,53 +108,60 @@ def create_direct_upi_order(request):
                 if food_item.quantity_available < qty:
                     return JsonResponse({'error': f'Sorry, "{food_item.name}" only has {food_item.quantity_available} left in stock.'}, status=400)
                 
-                subtotal += food_item.price * qty
-                order_items_to_create.append((food_item, qty, food_item.price))
+                subtotal += float(food_item.price) * qty
 
             delivery_fee = 10 if fulfillment_type == 'SEAT' else 0
-            total_amount = subtotal + delivery_fee
+            total_amount = float(subtotal) + delivery_fee
             amount_in_paise = int(total_amount * 100)
 
             if amount_in_paise < 100:
                 return JsonResponse({'error': 'Minimum order amount must be at least ₹1.'}, status=400)
 
-            # Create Order
-            order = Order.objects.create(
-                theater=theater,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                seat_number=seat_number,
-                fulfillment_type=fulfillment_type,
-                payment_method=payment_method,
-                total_amount=total_amount,
-                status='CONFIRMED' if payment_method == 'CASH' else 'PENDING'
-            )
-
-            # Create OrderItems and auto-decrement stock
-            for food_item, qty, price in order_items_to_create:
-                OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=price)
-                food_item.quantity_available -= qty
-                if food_item.quantity_available < 0:
-                    food_item.quantity_available = 0
-                food_item.save()
-
+            # If CASH: Create order immediately in DB
             if payment_method == 'CASH':
+                order = Order.objects.create(
+                    theater=theater,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    seat_number=seat_number,
+                    fulfillment_type=fulfillment_type,
+                    payment_method='CASH',
+                    total_amount=total_amount,
+                    status='CONFIRMED',
+                    is_paid=False
+                )
+
+                for item in items_data:
+                    food_item = FoodItem.objects.select_for_update().get(id=item['id'])
+                    qty = int(item['qty'])
+                    OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=food_item.price)
+                    food_item.quantity_available -= qty
+                    if food_item.quantity_available < 0:
+                        food_item.quantity_available = 0
+                    food_item.save()
+
                 return JsonResponse({'status': 'CASH_SUCCESS', 'order_id': order.id})
 
+            # If ONLINE: Do NOT create Order in DB yet. Initialize Razorpay order and cache cart in session using primitives.
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             razorpay_order = client.order.create({
                 "amount": amount_in_paise,
                 "currency": "INR",
-                "receipt": f"order_rcptid_{order.id}",
+                "receipt": f"rcpt_{theater_id}_{customer_phone}",
                 "payment_capture": 1
             })
             
-            order.razorpay_order_id = razorpay_order['id']
-            order.save()
+            # Save cart details temporarily in session using primitives to prevent serialization errors
+            request.session['pending_order_data'] = {
+                'items': items_data,
+                'fulfillment_type': fulfillment_type,
+                'total_amount': float(total_amount),
+                'razorpay_order_id': str(razorpay_order['id'])
+            }
+            request.session.modified = True
 
             return JsonResponse({
                 'status': 'RAZORPAY_ORDER_CREATED',
-                'order_id': order.id,
                 'razorpay_order_id': razorpay_order['id'],
                 'razorpay_merchant_key': settings.RAZORPAY_KEY_ID,
                 'total_amount': amount_in_paise,
@@ -164,7 +170,9 @@ def create_direct_upi_order(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
+
 @csrf_exempt
+@transaction.atomic
 def verify_razorpay_payment(request):
     if request.method == 'POST':
         try:
@@ -172,7 +180,6 @@ def verify_razorpay_payment(request):
             razorpay_order_id = data.get('razorpay_order_id')
             razorpay_payment_id = data.get('razorpay_payment_id')
             razorpay_signature = data.get('razorpay_signature')
-            order_id = data.get('order_id')
 
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             client.utility.verify_payment_signature({
@@ -181,20 +188,59 @@ def verify_razorpay_payment(request):
                 'razorpay_signature': razorpay_signature
             })
 
-            order = get_object_or_404(Order, id=order_id)
-            order.transaction_id = razorpay_payment_id
-            order.status = 'CONFIRMED'
-            order.is_paid = True
-            order.save()
+            pending_data = request.session.get('pending_order_data')
+            if not pending_data or pending_data.get('razorpay_order_id') != razorpay_order_id:
+                return JsonResponse({'status': 'FAILURE', 'error': 'Session expired or payment mismatch.'}, status=400)
+
+            theater_id = request.session.get('theater_id', 1)
+            theater = get_object_or_404(Theater, id=theater_id)
+            customer_name = request.session.get('customer_name', 'Guest')
+            customer_phone = request.session.get('customer_phone', '0000000000')
+            seat_number = request.session.get('seat', 'default')
+
+            items_data = pending_data['items']
+            fulfillment_type = pending_data['fulfillment_type']
+            total_amount = pending_data['total_amount']
+
+            # Create order only now that payment has succeeded and signature is verified
+            order = Order.objects.create(
+                theater=theater,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                seat_number=seat_number,
+                fulfillment_type=fulfillment_type,
+                payment_method='ONLINE',
+                total_amount=total_amount,
+                status='CONFIRMED',
+                is_paid=True,
+                transaction_id=razorpay_payment_id,
+                razorpay_order_id=razorpay_order_id
+            )
+
+            for item in items_data:
+                food_item = FoodItem.objects.select_for_update().get(id=item['id'])
+                qty = int(item['qty'])
+                if food_item.quantity_available < qty:
+                    raise Exception(f'Sorry, "{food_item.name}" went out of stock during payment processing.')
+                
+                OrderItem.objects.create(order=order, food_item=food_item, quantity=qty, price=food_item.price)
+                food_item.quantity_available -= qty
+                food_item.save()
+
+            # Clear session cache
+            if 'pending_order_data' in request.session:
+                del request.session['pending_order_data']
 
             return JsonResponse({'status': 'SUCCESS', 'order_id': order.id})
         except Exception as e:
             return JsonResponse({'status': 'FAILURE', 'error': str(e)}, status=400)
     return HttpResponseBadRequest("Invalid request method")
 
+
 def order_confirmed(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     return render(request, 'order_confirmed.html', {'order': order})
+
 
 def shopkeeper_login_view(request, theater_id):
     theater = get_object_or_404(Theater, id=theater_id)
@@ -213,12 +259,12 @@ def shopkeeper_login_view(request, theater_id):
             
     return render(request, 'shopkeeper_login.html', {'theater': theater, 'error': error})
 
+
 @login_required
 def shopkeeper_dashboard_view(request):
     theater = Theater.objects.first()
     active_tab = request.GET.get('tab', 'live')
     
-    # Handle Order Status Update
     if request.method == 'POST' and 'update_order_status' in request.POST:
         order_id = request.POST.get('order_id')
         new_status = request.POST.get('status')
@@ -227,7 +273,6 @@ def shopkeeper_dashboard_view(request):
         order_obj.save()
         return redirect('/shopkeeper/dashboard/?tab=live')
 
-    # Handle Menu Item Actions (Add/Edit/Delete) with Image Support
     if request.method == 'POST' and 'manage_menu' in request.POST:
         action = request.POST.get('action')
         item_id = request.POST.get('item_id')
@@ -263,10 +308,10 @@ def shopkeeper_dashboard_view(request):
                 item.save()
         return redirect('/shopkeeper/dashboard/?tab=menu')
 
-    orders = Order.objects.filter(theater=theater).order_by('-created_at')
-    live_orders = orders.exclude(status='DELIVERED') 
+    orders = Order.objects.filter(theater=theater).exclude(status='PENDING').order_by('-created_at')
+    live_orders = orders.filter(status__in=['CONFIRMED', 'PREPARING', 'READY'])
     
-    today_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    today_revenue = orders.filter(status__in=['CONFIRMED', 'PREPARING', 'READY', 'DELIVERED']).aggregate(total=Sum('total_amount'))['total'] or 0
     menu_items = FoodItem.objects.filter(theater=theater) if hasattr(FoodItem, 'theater') else FoodItem.objects.all()
 
     context = {
@@ -279,6 +324,7 @@ def shopkeeper_dashboard_view(request):
         'menu_items': menu_items,
     }
     return render(request, 'shopkeeper_dashboard.html', context)
+
 
 def order_detail_view(request, order_id):
     if not request.session.get('seat') or not request.session.get('theater_id'):
