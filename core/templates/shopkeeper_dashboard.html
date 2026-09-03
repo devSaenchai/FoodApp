@@ -114,7 +114,7 @@
                                 <div style="display: flex; flex-direction: column; gap: 6px;">
                                     {% for item in order.items.all %}
                                     <div style="display: flex; justify-content: space-between; font-size: 13px; max-width: 500px;">
-                                        <span>{{ item.food_item.name }} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
+                                        <span>{{ item.food_item.name }} {% if item.food_item.unit_spec %}<span style="color: var(--text-muted); font-size: 12px;">({{ item.food_item.unit_spec }})</span>{% endif %} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
                                     </div>
                                     {% empty %}
                                     <span style="color: var(--text-muted); font-size: 13px;">No items detail found for this order.</span>
@@ -177,7 +177,7 @@
                                 <div style="display: flex; flex-direction: column; gap: 6px;">
                                     {% for item in order.items.all %}
                                     <div style="display: flex; justify-content: space-between; font-size: 13px; max-width: 500px;">
-                                        <span>{{ item.food_item.name }} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
+                                        <span>{{ item.food_item.name }} {% if item.food_item.unit_spec %}<span style="color: var(--text-muted); font-size: 12px;">({{ item.food_item.unit_spec }})</span>{% endif %} <strong style="color: var(--text-muted);">x{{ item.quantity }}</strong></span>
                                     </div>
                                     {% empty %}
                                     <span style="color: var(--text-muted); font-size: 13px;">No items detail found for this order.</span>
@@ -211,11 +211,12 @@
             <!-- Add Item Form -->
             <div style="background: #ffffff; border-radius: 16px; padding: 20px; border: 1px solid #e2e8d5; margin-bottom: 24px; width: 100%;">
                 <div style="font-size: 15px; font-weight: 800; margin-bottom: 12px;">Add New Menu Item</div>
-                <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1.5fr auto; gap: 10px; width: 100%; align-items: center;">
+                <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1fr 1.2fr auto; gap: 10px; width: 100%; align-items: center;">
                     {% csrf_token %}
                     <input type="hidden" name="manage_menu" value="1">
                     <input type="hidden" name="action" value="add">
                     <input type="text" name="name" class="input-box" placeholder="Item Name" required style="margin: 0; padding: 10px;">
+                    <input type="text" name="unit_spec" class="input-box" placeholder="Unit/Spec (e.g., 150g)" style="margin: 0; padding: 10px;">
                     <select name="category" class="input-box" style="margin: 0; padding: 10px;">
                         <option value="SNACKS">Snacks</option>
                         <option value="DRINKS">Drinks</option>
@@ -235,6 +236,7 @@
                         <tr>
                             <th>Image</th>
                             <th>Item Name</th>
+                            <th>Unit / Spec</th>
                             <th>Category</th>
                             <th>Price (₹)</th>
                             <th>Stock</th>
@@ -258,6 +260,7 @@
                                     <input type="file" name="image" accept="image/*" style="font-size: 10px; margin-top: 4px; width: 90px;">
                                 </td>
                                 <td><input type="text" name="name" value="{{ item.name }}" class="input-box" style="padding: 6px 10px; font-size: 13px;" required></td>
+                                <td><input type="text" name="unit_spec" value="{{ item.unit_spec|default:'' }}" class="input-box" placeholder="e.g. 150g" style="padding: 6px 10px; font-size: 13px;"></td>
                                 <td>
                                     <select name="category" class="input-box" style="padding: 6px 10px; font-size: 13px;">
                                         <option value="SNACKS" {% if item.category == 'SNACKS' %}selected{% endif %}>Snacks</option>
@@ -283,7 +286,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No menu items found. Add items using the form above.</td>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No menu items found. Add items using the form above.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
